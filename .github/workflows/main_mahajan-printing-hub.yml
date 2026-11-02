@@ -75,7 +75,7 @@ jobs:
             echo "Unable to resolve resource group for web app 'mahajan-printing-hub'."
             exit 1
           fi
-          az webapp config set --name 'mahajan-printing-hub' --resource-group "$RESOURCE_GROUP" --startup-file "cd Mahajan-Printing-Hub-main && bash startup.sh"
+          az webapp config set --name 'mahajan-printing-hub' --resource-group "$RESOURCE_GROUP" --startup-file "if [ -f startup.sh ]; then bash startup.sh; else cd Mahajan-Printing-Hub-main && bash startup.sh; fi"
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3

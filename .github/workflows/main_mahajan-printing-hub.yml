@@ -32,14 +32,20 @@ jobs:
           source antenv/bin/activate
           pip install -r Mahajan-Printing-Hub-main/requirements.txt
                 
-      # By default, when you enable GitHub CI/CD integration through the Azure portal, the platform automatically sets the SCM_DO_BUILD_DURING_DEPLOYMENT application setting to true. This triggers the use of Oryx, a build engine that handles application compilation and dependency installation (e.g., pip install) directly on the platform during deployment. Hence, we exclude the antenv virtual environment directory from the deployment artifact to reduce the payload size. 
+      - name: Prepare deployment package
+        run: |
+          rm -rf deploy
+          mkdir deploy
+          cp -R Mahajan-Printing-Hub-main/. deploy/
+
+      # By default, when you enable GitHub CI/CD integration through the Azure portal, the platform automatically sets the SCM_DO_BUILD_DURING_DEPLOYMENT application setting to true. This triggers the use of Oryx, a build engine that handles application compilation and dependency installation (e.g., pip install) directly on the platform during deployment. Hence, we exclude the antenv virtual environment directory from the deployment artifact to reduce the payload size.
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
         with:
           name: python-app
           path: |
-            Mahajan-Printing-Hub-main/**
-            !Mahajan-Printing-Hub-main/antenv/**
+            deploy/**
+            !deploy/antenv/**
 
       # 🚫 Opting Out of Oryx Build
       # If you prefer to disable the Oryx build process during deployment, follow these steps:
@@ -75,7 +81,7 @@ jobs:
             echo "Unable to resolve resource group for web app 'mahajan-printing-hub'."
             exit 1
           fi
-          az webapp config set --name 'mahajan-printing-hub' --resource-group "$RESOURCE_GROUP" --startup-file "if [ -f startup.sh ]; then bash startup.sh; else cd Mahajan-Printing-Hub-main && bash startup.sh; fi"
+          az webapp config set --name 'mahajan-printing-hub' --resource-group "$RESOURCE_GROUP" --startup-file "bash startup.sh"
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3

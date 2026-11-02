@@ -70,17 +70,17 @@ jobs:
       - name: Configure Azure startup command
         run: |
           set -euo pipefail
-          RESOURCE_GROUP="$(az resource list --name 'mahajan-printing-hub' --resource-type 'Microsoft.Web/sites' --query '[0].resourceGroup' -o tsv)"
+          RESOURCE_GROUP="$(az resource list --name 'mahajan-printing-hub-hdhze9dzb8cphzar' --resource-type 'Microsoft.Web/sites' --query '[0].resourceGroup' -o tsv)"
           if [ -z "$RESOURCE_GROUP" ]; then
-            echo "Unable to resolve resource group for web app 'mahajan-printing-hub'."
+            echo "Unable to resolve resource group for web app 'mahajan-printing-hub-hdhze9dzb8cphzar'."
             exit 1
           fi
-          az webapp config set --name 'mahajan-printing-hub' --resource-group "$RESOURCE_GROUP" --startup-file "cd Mahajan-Printing-Hub-main && bash startup.sh"
+          az webapp config set --name 'mahajan-printing-hub-hdhze9dzb8cphzar' --resource-group "$RESOURCE_GROUP" --startup-file "cd Mahajan-Printing-Hub-main && bash startup.sh"
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'mahajan-printing-hub'
+          app-name: 'mahajan-printing-hub-hdhze9dzb8cphzar'
           slot-name: 'Production'
           

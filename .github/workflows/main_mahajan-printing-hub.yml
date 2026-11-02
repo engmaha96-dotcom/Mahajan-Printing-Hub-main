@@ -91,7 +91,7 @@ jobs:
             echo "Unable to resolve resource group for web app 'mahajan-printing-hub'."
             exit 1
           fi
-          az webapp config set --name 'mahajan-printing-hub' --resource-group "$RESOURCE_GROUP" --startup-file "python -m gunicorn --bind=0.0.0.0:\${PORT:-8000} --workers=2 --worker-class=uvicorn.workers.UvicornWorker main:app"
+          az webapp config set --name 'mahajan-printing-hub' --resource-group "$RESOURCE_GROUP" --startup-file "python -m gunicorn --bind=0.0.0.0:\$PORT --workers=2 --worker-class=uvicorn.workers.UvicornWorker main:app"
 
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3

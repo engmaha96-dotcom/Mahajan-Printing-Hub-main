@@ -8,10 +8,10 @@ import threading
 import time
 import uuid
 import zipfile
-from datetime import datetime
-from typing import Any, List
-
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
+from datetime import datetime, timedelta
+from typing import Any, List, Annotated
+import jwt
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
@@ -19,9 +19,12 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 
 try:
-    import fitz
+    import pymupdf as fitz
 except ImportError:
-    fitz = None
+    try:
+        import fitz
+    except ImportError:
+        fitz = None
 
 try:
     from pypdf import PdfReader
@@ -38,6 +41,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    favicon_path = os.path.join(BASE_DIR, "static", "images", "bangla_qr.png")
+    if os.path.exists(favicon_path):
+        return FileResponse(favicon_path)
+    return Response(status_code=204)
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
@@ -86,6 +96,8 @@ ALLOWED_DELIVERY = set(DELIVERY_RATES)
 ALLOWED_PAYMENT_METHODS = {"bkash", "nagad", "rocket", "cellfin", "cod"}
 ORDER_STATUSES = [
     "PENDING/VERIFICATION",
+    "SUCCESS",
+    "REJECTED",
     "Printing in Progress",
     "Binding & Finishing",
     "Ready for Pickup",
@@ -97,9 +109,51 @@ LEGACY_STATUS_MAP = {
 }
 temp_file_store: dict[str, dict[str, Any]] = {}
 admin_security = HTTPBasic(realm="Mahajan IT Printing Hub Admin")
+SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-change-in-prod")
+ALGORITHM = "HS256"
+
+def create_admin_token(username: str) -> str:
+    payload = {"sub": username, "exp": datetime.utcnow() + timedelta(hours=2)}
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+def get_current_admin(request: Request) -> str:
+    token = request.cookies.get("admin_token")
+    if not token:
+        # Fallback to basic auth for backward compatibility / existing endpoints if needed
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Basic "):
+            # Validate basic auth
+            import base64
+            try:
+                auth_decoded = base64.b64decode(auth_header[6:]).decode("utf-8")
+                username, password = auth_decoded.split(":", 1)
+                if secrets.compare_digest(username, ADMIN_USERNAME) and secrets.compare_digest(password, ADMIN_PASSWORD):
+                    return username
+            except Exception:
+                pass
+        raise HTTPException(status_code=401, detail="Unauthorized access.")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload.get("sub")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid session or token expired.")
 checkout_attempts: dict[str, list[float]] = {}
 checkout_lock = threading.Lock()
+calc_attempts: dict[str, list[float]] = {}
+calc_lock = threading.Lock()
 orders_lock = threading.Lock()
+
+def enforce_rate_limit(client_ip: str, store: dict, lock: threading.Lock, limit: int, window: int) -> None:
+    now = time.monotonic()
+    with lock:
+        recent = [attempt for attempt in store.get(client_ip, []) if now - attempt < window]
+        if len(recent) >= limit:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={"status": "error", "message": "Too many submission attempts. Please wait 1 minute before trying again."}
+            )
+        recent.append(now)
+        store[client_ip] = recent
 PHONE_PATTERN = re.compile(r"^01[3-9]\d{8}$")
 TRX_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{3,63}$")
 
@@ -208,14 +262,6 @@ def calculate_binding_cost(binding: str, page_count: int) -> int:
     return BINDING_RATES[binding]
 
 
-def enforce_checkout_rate_limit(client_ip: str) -> None:
-    now = time.monotonic()
-    with checkout_lock:
-        recent = [attempt for attempt in checkout_attempts.get(client_ip, []) if now - attempt < 300]
-        if len(recent) >= 5:
-            raise HTTPException(status_code=429, detail="Too many payment submissions. Try again in a few minutes.")
-        recent.append(now)
-        checkout_attempts[client_ip] = recent
 
 
 def validate_customer_fields(phone: str, trx_id: str, payment_method: str) -> tuple[str, str]:
@@ -230,7 +276,8 @@ def validate_customer_fields(phone: str, trx_id: str, payment_method: str) -> tu
 
 @app.post("/api/calculate")
 async def calculate_price(
-    files: List[UploadFile] = File(...),
+    request: Request,
+    files: Annotated[List[UploadFile], File(...)],
     paper_size: str = Form("A4"),
     color_type: str = Form("bw"),
     print_side: str = Form("single"),
@@ -239,99 +286,113 @@ async def calculate_price(
     delivery_option: str = Form("pickup"),
     copies: int = Form(1),
 ):
-    if not files:
-        raise HTTPException(status_code=400, detail="কমপক্ষে একটি PDF ফাইল আপলোড করুন।")
-    validate_upload_batch(files)
-    if copies < 1 or copies > 100:
-        raise HTTPException(status_code=400, detail="Copies 1 থেকে 100-এর মধ্যে হতে হবে।")
-    if any(not item.filename or not item.filename.lower().endswith(".pdf") for item in files):
-        raise HTTPException(status_code=400, detail="শুধুমাত্র PDF ফাইল আপলোড করুন।")
+    try:
+        enforce_rate_limit(request.client.host if request.client else "unknown", calc_attempts, calc_lock, 20, 60)
+        if not files:
+            raise HTTPException(status_code=400, detail="কমপক্ষে একটি PDF ফাইল আপলোড করুন।")
+        validate_upload_batch(files)
+        if copies < 1 or copies > 100:
+            raise HTTPException(status_code=400, detail="Copies 1 থেকে 100-এর মধ্যে হতে হবে।")
+        if any(not item.filename or not item.filename.lower().endswith(".pdf") for item in files):
+            raise HTTPException(status_code=400, detail="শুধুমাত্র PDF ফাইল আপলোড করুন।")
 
-    validate_options(paper_size, color_type, print_side, gsm, binding, delivery_option)
-    uploaded_file_data = []
-    combined_size = 0
-    total_pages = 0
-    for uploaded_file in files:
-        contents = await uploaded_file.read()
-        combined_size += len(contents)
+        validate_options(paper_size, color_type, print_side, gsm, binding, delivery_option)
+        uploaded_file_data = []
+        combined_size = 0
+        total_pages = 0
+        for uploaded_file in files:
+            contents = await uploaded_file.read()
+            combined_size += len(contents)
+            if combined_size > MAX_FILE_BYTES:
+                break
+            page_count = count_pdf_pages(contents)
+            total_pages += page_count
+            uploaded_file_data.append({
+                "file_name": os.path.basename(uploaded_file.filename or "unknown.pdf"),
+                "contents": contents,
+                "page_count": page_count,
+                "size_bytes": len(contents),
+            })
+
         if combined_size > MAX_FILE_BYTES:
-            break
-        page_count = count_pdf_pages(contents)
-        total_pages += page_count
-        uploaded_file_data.append({
-            "file_name": os.path.basename(uploaded_file.filename),
-            "contents": contents,
-            "page_count": page_count,
-            "size_bytes": len(contents),
-        })
+            raise HTTPException(status_code=413, detail=FILE_LIMIT_MESSAGE)
+        if total_pages < 1:
+            raise HTTPException(status_code=400, detail="PDF ফাইলগুলোতে কোনো পেজ পাওয়া যায়নি।")
 
-    if combined_size > MAX_FILE_BYTES:
-        raise HTTPException(status_code=413, detail=FILE_LIMIT_MESSAGE)
-    if total_pages < 1:
-        raise HTTPException(status_code=400, detail="PDF ফাইলগুলোতে কোনো পেজ পাওয়া যায়নি।")
+        rate_key = f"{color_type}_{print_side}"
+        unit_price = PRINT_RATES[paper_size][gsm][rate_key]
+        total_sheets = (total_pages + 1) // 2 if print_side == "double" else total_pages
+        print_cost = total_pages * unit_price * copies
+        binding_key = {"none": "pinning", "staple": "pinning"}.get(binding, binding)
+        binding_cost_for_order = calculate_binding_cost(binding_key, total_pages)
+        delivery_cost = DELIVERY_RATES[delivery_option]
+        grand_total = print_cost + binding_cost_for_order + delivery_cost
 
-    rate_key = f"{color_type}_{print_side}"
-    unit_price = PRINT_RATES[paper_size][gsm][rate_key]
-    total_sheets = (total_pages + 1) // 2 if print_side == "double" else total_pages
-    print_cost = total_pages * unit_price * copies
-    binding = {"none": "pinning", "staple": "pinning"}.get(binding, binding)
-    binding_cost_for_order = calculate_binding_cost(binding, total_pages)
-    delivery_cost = DELIVERY_RATES[delivery_option]
-    grand_total = print_cost + binding_cost_for_order + delivery_cost
+        session_id = str(uuid.uuid4())
+        temp_file_store[session_id] = {
+            "files": uploaded_file_data,
+            "details": {
+                "paper_size": paper_size,
+                "color_type": color_type,
+                "print_side": print_side,
+                "gsm": gsm,
+                "binding": binding_key,
+                "delivery_option": delivery_option,
+                "page_count": total_pages,
+                "total_sheets": total_sheets,
+                "copies": copies,
+                "file_count": len(uploaded_file_data),
+                "print_cost": round(print_cost, 2),
+                "binding_cost": round(binding_cost_for_order, 2),
+                "delivery_cost": round(delivery_cost, 2),
+                "grand_total": round(grand_total, 2),
+            },
+        }
 
-    session_id = str(uuid.uuid4())
-    temp_file_store[session_id] = {
-        "files": uploaded_file_data,
-        "details": {
-            "paper_size": paper_size,
-            "color_type": color_type,
-            "print_side": print_side,
-            "gsm": gsm,
-            "binding": binding,
-            "delivery_option": delivery_option,
-            "page_count": total_pages,
-            "total_sheets": total_sheets,
-            "copies": copies,
-            "file_count": len(uploaded_file_data),
-            "print_cost": round(print_cost, 2),
-            "binding_cost": round(binding_cost_for_order, 2),
-            "delivery_cost": round(delivery_cost, 2),
-            "grand_total": round(grand_total, 2),
-        },
-    }
-
-    return {
-        "status": "success",
-        "session_id": session_id,
-        "files": [
-            {
-                "file_name": item["file_name"],
-                "page_count": item["page_count"],
-                "size_bytes": item["size_bytes"],
-            }
-            for item in uploaded_file_data
-        ],
-        **temp_file_store[session_id]["details"],
-    }
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "files": [
+                {
+                    "file_name": item["file_name"],
+                    "page_count": item["page_count"],
+                    "size_bytes": item["size_bytes"],
+                }
+                for item in uploaded_file_data
+            ],
+            **temp_file_store[session_id]["details"],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        error_msg = traceback.format_exc()
+        print("========== CALCULATE ERROR TRACEBACK ==========")
+        print(error_msg)
+        print("===============================================")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
 @app.post("/api/checkout")
 async def process_checkout(
     request: Request,
     session_id: str = Form(""),
-    customer_name: str = Form(...),
-    customer_phone: str = Form(...),
-    address: str = Form(...),
+    customer_name: str = Form(""),
+    customer_phone: str = Form(""),
+    address: str = Form(""),
     area: str = Form(""),
     instructions: str = Form(""),
-    payment_method: str = Form(...),
+    payment_method: str = Form(""),
     trx_id: str = Form(""),
-    amount: float = Form(...),
+    amount: float = Form(0.0),
+    payment_mobile: str = Form(""),
 ):
-    enforce_checkout_rate_limit(request.client.host if request.client else "unknown")
-    customer_name = customer_name.strip()
+    enforce_rate_limit(request.client.host if request.client else "unknown", checkout_attempts, checkout_lock, 3, 60)
+    customer_name = html.escape(customer_name.strip())
     customer_phone = customer_phone.strip()
-    address = address.strip()
+    address = html.escape(address.strip())
+    payment_mobile = payment_mobile.strip()
+    trx_id = trx_id.strip()
     if not customer_name or not customer_phone or not address:
         raise HTTPException(status_code=400, detail="নাম, ফোন নম্বর এবং বিস্তারিত ঠিকানা দিন।")
     if payment_method not in ALLOWED_PAYMENT_METHODS:
@@ -341,15 +402,19 @@ async def process_checkout(
 
     customer_phone, trx_id = validate_customer_fields(customer_phone, trx_id, payment_method)
 
+    if not PHONE_PATTERN.fullmatch(payment_mobile):
+        raise HTTPException(status_code=400, detail="পেমেন্ট মোবাইল নম্বরটি সঠিক নয়।")
+
     session_data = temp_file_store[session_id]
     expected_amount = float(session_data["details"]["grand_total"])
     if abs(float(amount) - expected_amount) > 0.01:
         raise HTTPException(status_code=400, detail="অর্ডারের মোট বিল পরিবর্তিত হয়েছে। আবার হিসাব করুন।")
 
     with orders_lock:
-        existing_trx_ids = {str(item.get("trx_id", "")).casefold() for item in read_orders() if item.get("trx_id")}
-        if trx_id and trx_id.casefold() in existing_trx_ids:
-            raise HTTPException(status_code=409, detail="এই TrxID ইতিমধ্যে ব্যবহার করা হয়েছে।")
+        if trx_id:
+            existing_trx_ids = {str(item.get("trx_id", "")).casefold() for item in read_orders() if item.get("trx_id")}
+            if trx_id.casefold() in existing_trx_ids:
+                raise HTTPException(status_code=400, detail="This Transaction ID has already been submitted.")
 
         order_id = f"MJ-{uuid.uuid4().hex[:6].upper()}"
         saved_filenames = []
@@ -365,10 +430,11 @@ async def process_checkout(
             "customer_name": customer_name,
             "customer_phone": customer_phone,
             "address": address,
-            "area": area.strip(),
-            "instructions": instructions.strip(),
+            "area": html.escape(area.strip()),
+            "instructions": html.escape(instructions.strip()),
             "payment_method": payment_method,
-            "trx_id": trx_id,
+            "trx_id": html.escape(trx_id),
+            "payment_mobile": payment_mobile,
             "amount": expected_amount,
             "status": "PENDING/VERIFICATION",
             "file_name": saved_filenames[0],
@@ -393,7 +459,8 @@ async def process_checkout(
         "status": "success",
         "order_id": order_id,
         "amount": expected_amount,
-        "message": f"ধন্যবাদ {customer_name}! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে।",
+        "status_code": "PENDING/VERIFICATION",
+        "message": f"ধন্যবাদ {customer_name}! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে। এটি বর্তমানে ভেরিফিকেশনের জন্য PENDING অবস্থায় আছে।",
     }
 
 
@@ -455,13 +522,40 @@ def save_order_status(order_id: str, requested_status: str) -> dict[str, str]:
     }
 
 
+@app.post("/api/admin/login")
+async def admin_login(credentials: HTTPBasicCredentials = Depends(admin_security)):
+    username_ok = secrets.compare_digest(credentials.username, ADMIN_USERNAME)
+    password_ok = secrets.compare_digest(credentials.password, ADMIN_PASSWORD)
+    if not (username_ok and password_ok):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect admin username or password.",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    token = create_admin_token(credentials.username)
+    response = Response(content=json.dumps({"status": "success", "message": "Logged in successfully"}), media_type="application/json")
+    response.set_cookie(
+        key="admin_token",
+        value=token,
+        httponly=True,
+        samesite="strict",
+        secure=True,
+    )
+    return response
+
+@app.post("/api/admin/orders/{order_id}/status")
 @app.post("/api/admin/order/{order_id}/status")
 async def update_order_status(
     order_id: str,
     payload: StatusPayload,
-    _: str = Depends(require_admin),
+    admin_user: str = Depends(get_current_admin),
 ):
-    return save_order_status(order_id.strip().upper(), normalize_status(payload.status))
+    status_upper = payload.status.strip().upper()
+    if status_upper in ["SUCCESS", "REJECTED", "PENDING"]:
+        target_status = "PENDING/VERIFICATION" if status_upper == "PENDING" else status_upper
+    else:
+        target_status = normalize_status(payload.status)
+    return save_order_status(order_id.strip().upper(), target_status)
 
 
 @app.post("/api/admin/orders/update-status")

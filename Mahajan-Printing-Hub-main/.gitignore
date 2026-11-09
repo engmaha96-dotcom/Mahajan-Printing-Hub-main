@@ -1,0 +1,6 @@
+antenv/
+venv/
+.venv/
+__pycache__/
+*.pyc
+uploaded_files/

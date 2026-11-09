@@ -35,6 +35,14 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     :root { color-scheme: light; }
+    @keyframes slide {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(8px); }
+    }
+    .animate-slide { animation: slide 2s ease-in-out infinite; }
+    .icon-box { transition: transform 0.3s ease; }
+    .icon-box:hover { transform: scale(1.2) rotate(5deg); }
+
     html { scroll-behavior: smooth; }
     body { font-family: 'Instrument Sans', sans-serif; background: #f0f4f8; color: #10233b; }
     
@@ -160,7 +168,7 @@
         Fast &amp; Reliable Online Printing in <span class="text-blue-400">Nilkhet</span>
       </h1>
       <p class="mt-5 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-        Upload your PDF files, calculate costs instantly, and get high-quality printed documents delivered straight to your doorstep across Yours City.
+        Upload your PDF files, calculate costs instantly, and get high-quality printed documents delivered straight to your doorstep across Your Home & Office.
       </p>
       
       <div class="mt-8 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
@@ -173,9 +181,9 @@
       </div>
 
       <div class="mt-10 grid w-full max-w-3xl grid-cols-1 gap-4 border-t border-white/10 pt-6 text-sm text-slate-300 sm:grid-cols-3">
-        <span class="inline-flex items-center justify-center gap-2"><i data-lucide="calculator" class="h-4 w-4 text-[#00c98b]"></i> Instant Cost Calculator</span>
-        <span class="inline-flex items-center justify-center gap-2"><i data-lucide="wallet-cards" class="h-4 w-4 text-[#00c98b]"></i> bKash &amp; Nagad Accepted</span>
-        <span class="inline-flex items-center justify-center gap-2"><i data-lucide="truck" class="h-4 w-4 text-[#00c98b]"></i> Same-Day Delivery</span>
+        <span class="inline-flex items-center justify-center gap-2"><span class="icon-box animate-slide"><i data-lucide="calculator" class="h-4 w-4 text-[#00c98b]"></i></span> Instant Cost Calculator</span>
+        <span class="inline-flex items-center justify-center gap-2"><span class="icon-box animate-slide"><i data-lucide="wallet-cards" class="h-4 w-4 text-[#00c98b]"></i></span> Bangla QR: Scan & Pay with bKash, Nagad, Rocket or any Banking App.</span>
+        <span class="inline-flex items-center justify-center gap-2"><span class="icon-box animate-slide"><i data-lucide="truck" class="h-4 w-4 text-[#00c98b]"></i></span> Same-Day Delivery</span>
       </div>
     </div>
   </header>
@@ -212,6 +220,7 @@
             <div class="mb-6">
               <h3 class="text-2xl font-extrabold tracking-tight text-navy">Bring your file</h3>
               <p class="mt-1 text-sm leading-6 text-slate-500">PDF only, up to 200 MB. Your files stay attached to this order for our print team.</p>
+              <p class="mt-1 text-sm font-semibold text-royalBlue">পিডিএফ ফাইলের নামটি নিশ্চিত হয়ে আপলোড করুন।</p>
             </div>
             
             <label id="dropZone" for="pdfFile" class="drop-zone flex min-h-60 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-paper px-5 text-center transition hover:border-royalBlue hover:bg-blue-50/50">
@@ -241,7 +250,11 @@
 
           <!-- STEP 2: Customize Options -->
           <div class="step-panel hidden rounded-[24px] border border-slate-200 bg-white p-6 shadow-lift sm:p-8" data-panel="2">
-            <div class="mb-6"><h3 class="text-2xl font-extrabold tracking-tight text-navy">Make it yours</h3><p class="mt-1 text-sm leading-6 text-slate-500">Choose the paper and finish that fits your document.</p></div>
+            <div class="mb-6">
+              <h3 class="text-2xl font-extrabold tracking-tight text-navy">Make it yours</h3>
+              <p class="mt-1 text-sm leading-6 text-slate-500">Choose the paper and finish that fits your document.</p>
+              <p class="mt-1 text-sm font-semibold text-royalBlue">ডকুমেন্টের ধরন অনুযায়ী সঠিক কাগজ ও ফিনিশিং নির্বাচন করুন।</p>
+            </div>
             
             <div class="grid gap-6 sm:grid-cols-2">
               <fieldset>
@@ -316,11 +329,44 @@
 
           <!-- STEP 4: Review & Payment -->
           <div class="step-panel hidden rounded-[24px] border border-slate-200 bg-white p-6 shadow-lift sm:p-8" data-panel="4">
-            <div class="mb-6"><h3 class="text-2xl font-extrabold tracking-tight text-navy">Review and confirm</h3><p class="mt-1 text-sm leading-6 text-slate-500">Send payment to <strong>01839802001</strong>, then add your TrxID.</p></div>
-            <div class="rounded-2xl border border-gold/30 bg-gold/10 p-4 text-sm leading-6 text-ink"><strong class="flex items-center gap-2 text-gold"><i data-lucide="wallet" class="h-4 w-4"></i> Payment instructions</strong><span class="mt-1 block">Use Send Money / Payment to 01839802001. Cash on delivery is also available for Dhaka orders.</span></div>
-            
+            <div class="mb-6">
+              <h3 class="text-2xl font-extrabold tracking-tight text-navy">Review and confirm</h3>
+              <p class="mt-1 text-sm leading-6 text-slate-500">Bangla QR: Scan & Pay with bKash, Nagad, Rocket or any Banking App.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 items-center mb-6">
+              <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <div class="flex flex-col items-center">
+                  <img src="images/bangla_qr.png" alt="Bangla QR Code" class="w-40 h-40 p-2 bg-white border border-slate-200 rounded-xl shadow-sm object-contain" onerror="this.style.display='none'">
+                  <p class="text-[11px] text-center mt-2 text-slate-600 font-bold">Bangla QR Code</p>
+                </div>
+                <div class="flex flex-col items-center">
+                  <img src="images/raw_bkash.png" alt="bKash Merchant QR" class="w-40 h-40 p-2 bg-white border border-slate-200 rounded-xl shadow-sm object-contain" onerror="this.style.display='none'">
+                  <p class="text-[11px] text-center mt-2 text-slate-600 font-bold">bKash Merchant QR</p>
+                  <p class="text-[10px] text-center text-royalBlue font-semibold">Mahajan IT Consultancy and Logistics</p>
+                </div>
+              </div>
+              <div class="bg-gradient-to-br from-paper to-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <p class="text-sm font-bold text-slate-500 mb-3 flex items-center gap-2">
+                  <i data-lucide="smartphone" class="w-4 h-4"></i> Payment Number:
+                </p>
+                <div class="flex items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-inner">
+                  <span id="paymentNum" class="text-2xl font-black text-navy tracking-tight">01839802001</span>
+                  <button type="button" id="copyNumBtn" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-royalBlue text-white text-xs font-extrabold hover:bg-navy transition shadow-sm" title="Copy Number">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy
+                  </button>
+                </div>
+                <p class="text-xs text-slate-500 mt-3 font-medium">Verified bKash Merchant QR for secure payments.</p>
+              </div>
+            </div>
+
+            <div class="rounded-2xl border border-gold/30 bg-gold/10 p-4 text-sm leading-6 text-ink mb-6">
+              <strong class="flex items-center gap-2 text-gold"><i data-lucide="wallet" class="h-4 w-4"></i> Payment instructions</strong>
+              <span class="mt-1 block">Pay the total amount to the number above, then enter your Transaction ID (TrxID) and the Mobile Number you used to pay.</span>
+            </div>
+
             <div id="reviewSummary" class="mt-5 grid gap-3 rounded-2xl bg-paper p-5 text-sm"></div>
-            
+
             <div class="mt-5 grid gap-5 sm:grid-cols-2">
               <fieldset><legend class="mb-2 block text-sm font-extrabold text-navy">Payment method *</legend><div id="paymentMethod" class="grid grid-cols-2 gap-2">
                 <label class="choice cursor-pointer"><input class="sr-only" type="radio" name="payment_method" value="bkash" checked><span class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-bold"><b class="grid h-7 w-7 place-items-center rounded-lg bg-[#e2136e] text-[10px] text-white">bK</b>bKash</span></label>
@@ -329,7 +375,11 @@
                 <label class="choice cursor-pointer"><input class="sr-only" type="radio" name="payment_method" value="cellfin"><span class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-bold"><b class="grid h-7 w-7 place-items-center rounded-lg bg-[#087f5b] text-[10px] text-white">C</b>CellFin</span></label>
                 <label class="choice cursor-pointer col-span-2"><input class="sr-only" type="radio" name="payment_method" value="cod"><span class="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-sm font-bold"><b class="grid h-7 w-7 place-items-center rounded-lg bg-slate-600 text-[10px] text-white">৳</b>Cash on delivery</span></label>
               </div></fieldset>
-              <label><span class="mb-2 block text-sm font-extrabold text-navy">Transaction ID</span><input id="trxId" class="field" placeholder="Required for digital payment"></label>
+
+              <div class="grid gap-5">
+                <label><span class="mb-2 block text-sm font-extrabold text-navy">Transaction ID *</span><input id="trxId" class="field" placeholder="TrxID"></label>
+                <label><span class="mb-2 block text-sm font-extrabold text-navy">Payment Mobile Number *</span><input id="paymentMobile" class="field" placeholder="Mobile Number"></label>
+              </div>
             </div>
             <p id="paymentHint" class="mt-2 text-xs text-slate-500">For digital payment, enter the TrxID so we can match your payment quickly.</p>
             
@@ -361,7 +411,7 @@
           <div class="receipt-paper mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 shadow-lift">
             <header class="flex items-start justify-between gap-6 border-b-2 border-navy pb-6">
               <div class="flex items-center gap-4">
-                <img src="image_8.png" alt="MICL logo" class="h-16 w-16 object-contain" onerror="this.style.display='none'">
+                <img src="images/bangla_qr.png" alt="MICL logo" class="h-16 w-16 object-contain" onerror="this.style.display='none'">
                 <div><h1 class="receipt-brand text-2xl font-extrabold">MICL - Mahajan IT Consultancy and Logistics</h1><p class="mt-1 text-sm text-slate-600">Operated by Mahajan IT Printing Hub, a sister concern of MICL</p></div>
               </div>
               <div class="text-right"><p class="receipt-accent text-xs font-extrabold uppercase tracking-[.14em]">Order Receipt</p><p id="printReceiptDate" class="mt-1 text-xs text-slate-500"></p></div>
@@ -403,14 +453,32 @@
           </div>
         </section>
 
-        <section class="rounded-[24px] border border-gold/30 bg-gold/10 p-5">
-          <div class="flex gap-3">
-            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gold text-white"><i data-lucide="headphones" class="h-5 w-5"></i></span>
+        <section class="rounded-[24px] bg-[#0B192C] p-6 text-white shadow-card3d border border-[#FFB800]/30 transition-all hover:border-[#FFB800]/60">
+          <div class="flex items-center gap-3 border-b border-white/10 pb-4">
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#FFB800] text-[#0B192C]">
+              <i data-lucide="headphones" class="h-5 w-5"></i>
+            </span>
             <div>
-              <h3 class="font-extrabold text-ink">Need a specialist job?</h3>
-              <p class="mt-1 text-xs leading-5 text-ink/70">For Deed documents, official stamps, AutoCAD drawings, and digital banners, message our manual helpline.</p>
-              <a href="https://wa.me/8801839802001" target="_blank" rel="noreferrer" class="mt-2 inline-flex items-center gap-1.5 text-xs font-extrabold text-gold hover:underline">WhatsApp 01839802001 <i data-lucide="arrow-up-right" class="h-3.5 w-3.5"></i></a>
+              <h3 class="text-lg font-extrabold text-white flex items-center gap-1.5">Need a Specialist Job? 📞</h3>
+              <p class="text-xs text-slate-300 mt-0.5">বিশেষায়িত ও প্রফেশনাল প্রিন্টিং সেবার জন্য আমাদের ম্যানুয়াল হেল্পলাইনে যোগাযোগ করুন:</p>
             </div>
+          </div>
+
+          <ul class="mt-4 space-y-2.5 text-xs text-slate-200 font-medium">
+            <li class="flex items-center gap-2"><span class="text-base">📜</span> দলিল ও চুক্তিপত্র / Deed Documents</li>
+            <li class="flex items-center gap-2"><span class="text-base">🏛️</span> অফিসিয়াল স্ট্যাম্প / Official Stamps</li>
+            <li class="flex items-center gap-2"><span class="text-base">📐</span> অটোক্যাড অঙ্কন / AutoCAD Drawings</li>
+            <li class="flex items-center gap-2"><span class="text-base">🖼️</span> ডিজিটাল ব্যানার / Digital Banners</li>
+            <li class="flex items-center gap-2"><span class="text-base">✉️</span> এনভেলপ ও লেটারহেড / Envelopes & Letterheads</li>
+            <li class="flex items-center gap-2"><span class="text-base">🧾</span> ক্যাশ মেমো ও ইনভয়েস / Cash Memo & Invoices</li>
+            <li class="flex items-center gap-2"><span class="text-base">🎴</span> বিজনেস কার্ড, লিফলেট ও স্টিকার / Cards, Leaflets & Stickers</li>
+          </ul>
+
+          <div class="mt-6 pt-2">
+            <a href="https://wa.me/8801839802001" target="_blank" rel="noreferrer" class="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#FFB800] px-4 font-extrabold text-[#0B192C] shadow-md transition-all hover:bg-[#e0a200] hover:scale-[1.02]">
+              <span>WhatsApp: 01839802001</span>
+              <i data-lucide="arrow-up-right" class="h-4 w-4"></i>
+            </a>
           </div>
         </section>
       </aside>
@@ -503,17 +571,17 @@
           <span class="grid h-11 w-11 place-items-center rounded-xl bg-royalBlue text-white shadow-glow"><i data-lucide="printer" class="h-5 w-5"></i></span>
           <strong class="text-lg tracking-tight">Mahajan IT Printing Hub</strong>
         </div>
-        <p class="mt-5 max-w-sm leading-6 text-slate-400">Fast, transparent, and dependable online printing with doorstep delivery across Yours City.</p>
+        <p class="mt-5 max-w-sm leading-6 text-slate-400">Fast, transparent, and dependable online printing with doorstep delivery across Your Home & Office.</p>
         <a href="https://wa.me/8801839802001" target="_blank" rel="noreferrer" class="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#00a878] px-4 py-2 font-extrabold text-white shadow-md transition hover:-translate-y-0.5"><i data-lucide="message-square" class="h-4 w-4"></i> Chat on WhatsApp</a>
       </div>
 
       <div>
         <h2 class="text-sm font-extrabold uppercase tracking-[.08em] text-white">VISIT &amp; CONTACT US</h2>
         <div class="mt-5 space-y-3.5 text-slate-300">
-          <p class="flex gap-3 leading-6"><i data-lucide="map-pin" class="mt-1 h-4 w-4 shrink-0 text-blue-400"></i><span>Banijyik Bitan Super Market, 2nd Floor, Shop No. C-61, C-62, Nilkhet, New Market, Dhaka-1205.</span></p>
-          <p class="flex gap-3"><i data-lucide="clock-3" class="mt-0.5 h-4 w-4 shrink-0 text-blue-400"></i><span>Operating Hours: 9:00 AM – 10:00 PM (Daily except public holidays.)</span></p>
+          <p class="flex gap-3 leading-6"><i data-lucide="map-pin" class="mt-1 h-4 w-4 shrink-0 text-blue-400"></i><span>Banizza Bitan Super Market, 2nd Floor, Shop No. C-61, C-62, Nilkhet, New Market, Dhaka-1205.</span></p>
+          <p class="flex gap-3"><i data-lucide="clock-3" class="mt-0.5 h-4 w-4 shrink-0 text-blue-400"></i><span>Operating Hours: 9:30 AM – 9:00 PM (Daily except Market & public holidays.)</span></p>
           <p class="flex gap-3"><i data-lucide="phone" class="mt-0.5 h-4 w-4 shrink-0 text-blue-400"></i><a href="tel:01839802001" class="transition hover:text-white">01839802001</a></p>
-          <p class="flex gap-3"><i data-lucide="message-circle" class="mt-0.5 h-4 w-4 shrink-0 text-blue-400"></i><span>WhatsApp · bKash · Nagad · Bangla QR</span></p>
+          <p class="flex gap-3"><i data-lucide="message-circle" class="mt-0.5 h-4 w-4 shrink-0 text-blue-400"></i><span>WhatsApp · Bangla QR: Scan & Pay with any Banking App</span></p>
         </div>
       </div>
 
@@ -525,7 +593,7 @@
       </div>
     </div>
 
-    <div class="mx-auto mt-12 max-w-7xl border-t border-white/10 pt-6 text-center text-xs text-slate-400">© 2026 Mahajan IT Printing Hub. All rights reserved.</div>
+    <div class="mx-auto mt-12 max-w-7xl border-t border-white/10 pt-6 text-center text-xs text-slate-400">© 2026 Mahajan IT Printing Hub. A sister concern of Mahajan IT Consultancy & Logistics. All rights reserved. </div>
   </footer>
 
   <script src="app.js"></script>

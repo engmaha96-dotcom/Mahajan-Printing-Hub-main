@@ -200,8 +200,14 @@ document.addEventListener('DOMContentLoaded', () => {
     formData.append('copies', document.getElementById('copies').value);
 
     const response = await fetch('/api/calculate', { method: 'POST', body: formData });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
     const data = await response.json();
-    if (!response.ok || data.status !== 'success') {
+    if (data.status !== 'success') {
       const error = new Error(data.detail || 'Unable to calculate price.');
       if (error.message.includes('একই নামে')) {
         showFileLimitModal(DUPLICATE_FILE_MESSAGE);
@@ -386,6 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
       formData.append('instructions', document.getElementById('instructions').value);
       formData.append('payment_method', selectedValue('payment_method'));
       formData.append('trx_id', document.getElementById('trxId').value);
+      formData.append('payment_mobile', document.getElementById('paymentMobile').value);
       formData.append('amount', calculatedOrder.grand_total);
 
       try {
@@ -393,6 +400,11 @@ document.addEventListener('DOMContentLoaded', () => {
           method: 'POST',
           body: formData
         });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Server error: ${response.status} ${response.statusText} - ${errorText}`);
+        }
 
         const data = await response.json();
 
@@ -427,8 +439,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const result = document.getElementById('trackResult');
       try {
         const response = await fetch(`/api/orders/track/${encodeURIComponent(document.getElementById('trackId').value)}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Server error: ${response.status} ${response.statusText} - ${errorText}`);
+        }
         const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || 'Order not found.');
         result.innerHTML = `<strong>${data.order_id}</strong><span class="ml-3">${data.status_label}</span><p class="mt-2 text-sm text-slate-500">${data.page_count} pages · ৳ ${Number(data.amount).toFixed(2)}</p>`;
         result.classList.remove('hidden');
       } catch (err) {
@@ -438,8 +453,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // New Order Reset
-  const newOrderBtn = document.getElementById('newOrder');
+  // Copy Payment Number Logic
+  const copyNumBtn = document.getElementById('copyNumBtn');
+  if (copyNumBtn) {
+    copyNumBtn.addEventListener('click', () => {
+      const numText = document.getElementById('paymentNum').innerText.trim();
+      navigator.clipboard.writeText(numText).then(() => {
+        const originalHTML = copyNumBtn.innerHTML;
+        copyNumBtn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i> Copied!`;
+        if (window.lucide) lucide.createIcons();
+        setTimeout(() => {
+          copyNumBtn.innerHTML = originalHTML;
+          if (window.lucide) lucide.createIcons();
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy text: ', err);
+      });
+    });
+  }
   if (newOrderBtn) {
     newOrderBtn.addEventListener('click', () => {
       window.location.reload();
